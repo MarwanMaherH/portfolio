@@ -65,7 +65,15 @@ window.addEventListener('DOMContentLoaded', () => {
     .to('.hero__underline path', { strokeDashoffset: 0, duration: 0.9, ease: 'power2.inOut' }, '-=0.75')
     .to('.hero__statement', { opacity: 0.82, y: 0, duration: 0.7 }, '-=0.7')
     .to('.hero__actions', { opacity: 1, y: 0, duration: 0.7 }, '-=0.55')
+    .to('.hero__scene', { opacity: 1, y: 0, duration: 1, ease: 'power2.out' }, '-=0.6')
+    .to('.hero__sparkles svg', { opacity: 1, scale: 1, duration: 0.6, stagger: 0.12, ease: 'back.out(2)' }, '-=0.7')
     .to('.hero__ghost', { opacity: 1, duration: 1.4 }, '-=1.1');
+
+  if (window.gsap.utils) {
+    gsap.to('.hero__sparkles svg', {
+      y: '+=8', duration: 2.2, ease: 'sine.inOut', yoyo: true, repeat: -1, stagger: 0.3
+    });
+  }
 });
 
 /* ---------- Scroll reveals ---------- */
@@ -180,9 +188,9 @@ if (!prefersReduced && window.matchMedia('(hover: hover)').matches) {
   const bgUniforms = {
     uTime: { value: 0 },
     uAspect: { value: 1 },
-    uColorBg: { value: new THREE.Color(0x050505) },
-    uColorA: { value: new THREE.Color(0xc6a468) }, // gold
-    uColorB: { value: new THREE.Color(0x4fd1ff) }  // electric contrast
+    uColorBg: { value: new THREE.Color(0x0a2a63) },   // deep sky blue
+    uColorA: { value: new THREE.Color(0x5fb3ff) },    // mid sky blue
+    uColorB: { value: new THREE.Color(0xffffff) }     // soft cloud white
   };
   const bgMat = new THREE.ShaderMaterial({
     uniforms: bgUniforms,
@@ -230,11 +238,11 @@ if (!prefersReduced && window.matchMedia('(hover: hover)').matches) {
         float n2 = fbm(p * 1.7 - vec2(uTime * 0.05, uTime * 0.03));
 
         vec3 col = uColorBg;
-        col = mix(col, uColorA, smoothstep(0.25, 0.85, n1) * 0.5);
-        col = mix(col, uColorB, smoothstep(0.4, 0.9, n2) * 0.4);
+        col = mix(col, uColorA, smoothstep(0.2, 0.75, n1) * 0.75);
+        col = mix(col, uColorB, smoothstep(0.55, 0.95, n2) * 0.35);
 
-        float vig = smoothstep(1.15, 0.25, distance(uv, vec2(0.5, 0.42)) * 1.3);
-        col *= mix(0.35, 1.0, vig);
+        float vig = smoothstep(1.3, 0.15, distance(uv, vec2(0.5, 0.38)) * 1.15);
+        col = mix(col * 0.75, col, vig);
 
         gl_FragColor = vec4(col, 1.0);
       }
@@ -263,28 +271,29 @@ if (!prefersReduced && window.matchMedia('(hover: hover)').matches) {
   const particles = new THREE.Points(pGeo, pMat);
   scene.add(particles);
 
-  /* -------- Low-poly eagle, gliding across the hero on a loop -------- */
-  const eagle = new THREE.Group();
-  const wingShape = new THREE.Shape();
-  wingShape.moveTo(0, 0);
-  wingShape.lineTo(1.15, 0.32);
-  wingShape.lineTo(0.85, -0.08);
-  wingShape.lineTo(0.35, -0.05);
-  wingShape.closePath();
-  const wingGeo = new THREE.ShapeGeometry(wingShape);
-  const wingMat = new THREE.MeshBasicMaterial({
-    color: 0x4fd1ff, side: THREE.DoubleSide, transparent: true, opacity: 0.9
+  /* -------- Low-poly paper plane, gliding across the sky on a loop -------- */
+  const plane = new THREE.Group();
+  const bodyShape = new THREE.Shape();
+  bodyShape.moveTo(0.9, 0);
+  bodyShape.lineTo(-0.7, 0.32);
+  bodyShape.lineTo(-0.4, 0);
+  bodyShape.lineTo(-0.7, -0.32);
+  bodyShape.closePath();
+  const bodyGeo2 = new THREE.ShapeGeometry(bodyShape);
+  const planeMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.95
   });
-  const wingL = new THREE.Mesh(wingGeo, wingMat);
-  const wingR = new THREE.Mesh(wingGeo, wingMat);
-  wingR.scale.x = -1;
-  const bodyGeo = new THREE.ConeGeometry(0.07, 0.5, 6);
-  const bodyMat = new THREE.MeshBasicMaterial({ color: 0xf5f3ee, transparent: true, opacity: 0.95 });
-  const body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.rotation.z = Math.PI / 2;
-  eagle.add(wingL, wingR, body);
-  eagle.scale.setScalar(0.75);
-  scene.add(eagle);
+  const wingTop = new THREE.Mesh(bodyGeo2, planeMat);
+  const wingBottom = new THREE.Mesh(bodyGeo2, planeMat.clone());
+  wingBottom.material.color.set(0x4fd1ff);
+  wingBottom.material.opacity = 0.75;
+  wingTop.rotation.x = 0.28;
+  wingBottom.rotation.x = -0.5;
+  plane.add(wingTop, wingBottom);
+  plane.scale.setScalar(0.85);
+  scene.add(plane);
+  const eagle = plane; // keep variable name for the animation loop below
+  const wingL = wingTop, wingR = wingBottom, body = null;
 
   let mouseX = 0, mouseY = 0;
   window.addEventListener('mousemove', (e) => {
@@ -317,7 +326,7 @@ if (!prefersReduced && window.matchMedia('(hover: hover)').matches) {
     pGeo.attributes.position.needsUpdate = true;
     particles.rotation.y = t * 0.02;
 
-    /* eagle flight path: a slow, looping glide with wing-flap */
+    /* paper-plane flight path: a slow, looping glide with a gentle wing tilt */
     const cycle = 16; // seconds per full loop
     const p = (t % cycle) / cycle;
     const angle = p * Math.PI * 2;
